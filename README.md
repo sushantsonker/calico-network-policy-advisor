@@ -24,7 +24,7 @@ Amazon Bedrock Knowledge Base
 |
 v
 Vector Store
-(OpenSearch Serverless / Pinecone / Aurora PostgreSQL pgvector)
+(OpenSearch Serverless)
 |
 v
 Retrieved Context
@@ -77,6 +77,32 @@ Final Answer
 | Automated Reasoning Checks | Validates policy logic before final response |
 | Fine-tuning / LoRA | Evaluated, but not required for this version |
 
+| Decision | Choice | Reason |
+|---|---|---|
+| Knowledge Base source | Amazon S3 | Simple manual upload model for prototype |
+| Ingestion method | Manual upload | Keeps project under 2 hours |
+| Flow log format | JSONL | Preserves one event per line and works well for structured logs |
+| Vector store | OpenSearch Serverless | AWS-native integration with Bedrock Knowledge Bases |
+
+## Guardrails for Policy Recommendations
+
+| Guardrail | Rule |
+|---|---|
+| Namespace required | Any newly recommended `NetworkPolicy` must include `metadata.namespace`. |
+| Source selector required | Any allow rule must include a source selector, namespace selector, or clearly scoped source identity. |
+| Destination selector required | Any allow rule must include a destination selector, destination namespace, service, port, or clearly scoped destination identity. |
+| No broad allow | Reject recommendations using `selector: all()` unless explicitly justified and limited by namespace, port, and direction. |
+| Audit attribution required | Explanation must include original policy author and approver when available in `metadata.labels` or `metadata.annotations`. |
+
+## Policy Attribution Design
+
+Calico NetworkPolicy supports Kubernetes-style metadata, including labels and annotations.
+
+For this project:
+- `metadata.labels` will be used for searchable/filterable attributes such as team, environment, app, and policy owner group.
+- `metadata.annotations` will be used for audit attributes such as author, approver, change ticket, and approval reason.
+
+The assistant must include author and approver information in denial explanations when those fields are present.
 ---
 
 ## 6. Retrieval Flow
@@ -98,8 +124,25 @@ Step 6: Generate explanation
 Step 7: Apply guardrails and reasoning checks
 Step 8: Return final answer
 
+## Retrieval Strategy
 
----
+| Strategy | Implementation | Reason |
+|----------|--------------|--------|
+| Dense Embeddings | Amazon Bedrock embedding model | Captures semantic intent of queries |
+| Sparse Retrieval | BM25 / keyword search | Ensures exact match for structured fields |
+| Hybrid Search | Combined dense + sparse | Improves recall and precision |
+| Metadata Filtering | Applied before retrieval | Narrows search space (namespace, pod, action) |
+
+### Metadata Design
+
+Metadata is stored separately from embeddings to enable efficient filtering and avoid degrading semantic embedding quality.
+
+Example:
+- namespace
+- source_pod
+- destination_pod
+- action (ALLOW/DENY)
+- policy_name
 
 ## 7. Chunking Strategy Summary
 
