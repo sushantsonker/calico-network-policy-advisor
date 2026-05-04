@@ -1,0 +1,104 @@
+# 1. Allow frontend → API
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-api
+  namespace: prod
+  labels:
+    app.kubernetes.io/author: platform-team
+    app.kubernetes.io/approved-by: secops
+    policy-purpose: allow-app-traffic
+spec:
+  selector: app == "api"
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      source:
+        selector: app == "frontend"
+      destination:
+        ports:
+          - 8080
+      protocol: TCP
+
+---
+# 2. Allow API → DB
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-db
+  namespace: prod
+  labels:
+    app.kubernetes.io/author: app-team
+    app.kubernetes.io/approved-by: secops
+    policy-purpose: allow-database-access
+spec:
+  selector: app == "postgres"
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      source:
+        selector: app == "api"
+      destination:
+        ports:
+          - 5432
+      protocol: TCP
+
+---
+# 3. Allow API → external payment service
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-payment-service
+  namespace: prod
+  labels:
+    app.kubernetes.io/author: payments-team
+    app.kubernetes.io/approved-by: secops
+    policy-purpose: allow-external-payment-api
+spec:
+  selector: app == "api"
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      destination:
+        nets:
+          - 203.0.113.20/32
+        ports:
+          - 443
+      protocol: TCP
+
+---
+# 4. Default DENY (Ingress)
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: prod
+  labels:
+    app.kubernetes.io/author: platform-team
+    app.kubernetes.io/approved-by: secops
+    policy-purpose: zero-trust-baseline
+spec:
+  selector: all()
+  types:
+    - Ingress
+  ingress: []
+
+---
+# 5. Default DENY (Egress)
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: prod
+  labels:
+    app.kubernetes.io/author: platform-team
+    app.kubernetes.io/approved-by: secops
+    policy-purpose: zero-trust-baseline
+spec:
+  selector: all()
+  types:
+    - Egress
+  egress: []
